@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Remove-Item \"C:\\\\Users\\\\crist\\\\Downloads\\\\penaranda-post1-u12\\\\penaranda-post1-u12\\\\src\\\\main\\\\java\\\\com\\\\empresa\\\\pedidos\\\\infraestructura\\\\notificaciones\\\\PedidoProcesadoEvent.java\")"
+    ]
+  }
+}

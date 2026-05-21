@@ -1,119 +1,113 @@
-# penaranda-post1-u12
+# penaranda-post2-u12
 
-**Unidad 12 — Integración de Patrones y Arquitecturas**  
-Post-Contenido 1 · Patrones de Diseño de Software · Ingeniería de Sistemas · UDES 2026
+**Unidad 12 — Validacion Arquitectonica con ArchUnit y ADR**  
+Post-Contenido 2 · Patrones de Diseño de Software · Ingeniería de Sistemas · UDES 2026
 
----
-
-## Descripción del sistema
-
-Sistema de gestión de pedidos construido con Spring Boot 3.x que integra cuatro
-patrones de diseño sobre una arquitectura hexagonal. El punto de partida fue un
-servicio monolítico (`ServicioPedidosLegacy`) con CC=4 y Cognitive Complexity=6;
-el resultado final tiene CC=1 en `FachadaPedidos` y cero acoplamiento directo desde
-la capa de aplicación a infraestructura.
+> Extiende el proyecto del Post-Contenido 1 con reglas ArchUnit ejecutables,
+> pipeline de GitHub Actions y documentacion de decisiones en formato ADR.
 
 ---
 
-## Arquitectura del sistema
+## Estructura del proyecto
 
 ```
-com.empresa.pedidos/
-├── dominio/              ← núcleo, sin dependencias externas
-│   ├── Pedido.java
-│   ├── TipoPedido.java
-│   ├── EstadoPedido.java
-│   └── puertos/          ← interfaces (contratos)
-│       ├── RepositorioPedidos.java
-│       ├── ProcesadorPedido.java   (Strategy interface)
-│       └── ServicioNotificacion.java
-├── aplicacion/           ← casos de uso
-│   └── ProcesadorPedidoFactory.java  (Factory)
-├── infraestructura/      ← implementaciones externas
-│   ├── persistencia/
-│   │   └── RepositorioPedidosJpa.java
-│   └── notificaciones/
-│       ├── PedidoProcesadoEvent.java
-│       ├── NotificacionEmail.java    (Observer)
-│       └── NotificacionLog.java     (Observer)
-└── adaptadores/          ← entrada/salida
-    ├── procesadores/     ← Strategy implementations
-    ├── facade/
-    │   └── FachadaPedidos.java      (Facade)
-    └── rest/
-        └── PedidoController.java
+penaranda-post2-u12/
+├── .github/workflows/
+│   └── arquitectura.yml          ← pipeline CI con ArchUnit
+├── docs/adr/
+│   ├── ADR-001.md                ← Arquitectura Hexagonal
+│   ├── ADR-002.md                ← Factory + Strategy
+│   └── ADR-003.md                ← Spring Events (Observer)
+├── src/
+│   ├── main/java/com/empresa/pedidos/   ← codigo del Post-Contenido 1
+│   └── test/java/com/empresa/pedidos/
+│       ├── ReglasArquitectura.java      ← 5 reglas ArchUnit (@ArchTest)
+│       ├── ArquitecturaTest.java        ← pruebas ArchUnit del PC1
+│       ├── IntegracionPedidosTest.java
+│       └── ProcesadorPedidoFactoryTest.java
+├── capturas/
+│   ├── pipeline-verde.png
+│   └── pipeline-rojo.png
+└── README.md
 ```
 
 ---
 
-## Patrones implementados y justificación
+## Validacion Arquitectonica
 
-| Patrón | Clase principal | Problema que resuelve |
-|---|---|---|
-| **Strategy** | `ProcesadorPedido` + 3 implementaciones | Elimina el switch sobre `TipoPedido`; cada algoritmo de cálculo está encapsulado en su propia clase |
-| **Factory** | `ProcesadorPedidoFactory` | Centraliza la selección dinámica de Strategy sin que el servicio conozca las implementaciones concretas |
-| **Observer** | `PedidoProcesadoEvent` + listeners | Desacopla la notificación del procesamiento; nuevos listeners no requieren modificar `FachadaPedidos` |
-| **Facade** | `FachadaPedidos` | Simplifica la interfaz para el controlador REST; oculta la coordinación de Factory, Strategy, repositorio y publisher |
+Las siguientes 5 reglas ArchUnit codifican las restricciones de la arquitectura
+hexagonal como pruebas ejecutables. Se ejecutan automaticamente en GitHub Actions
+en cada push a `main` o `develop`.
 
----
+### Regla 1 — dominioAislado
+El dominio (`..dominio..`) no debe depender de infraestructura, adaptadores,
+`javax.persistence` ni `org.springframework.mail`. Garantiza que el nucleo de
+negocio es independiente de frameworks externos.
 
-## Métricas comparativas (SonarQube)
+### Regla 2 — controladorSoloFacade
+Los controladores REST (`..adaptadores.rest..`) solo pueden acceder a la Facade
+y al dominio. El controlador no debe conocer Factory, procesadores ni repositorios.
 
-| Métrica | Antes (Legacy) | Después (Refactorizado) |
-|---|---|---|
-| Cyclomatic Complexity (servicio principal) | 4 | 1 |
-| Cognitive Complexity | 6 | 0 |
-| Acoplamiento a JavaMailSender | Directo | Eliminado |
-| Acoplamiento a JPA Repository desde aplicación | Directo | Via puerto |
-| Cobertura de pruebas | — | ≥ 80% |
+### Regla 3 — puertosComoInterfaces
+Todas las clases en `..dominio.puertos..` deben ser interfaces. Los puertos son
+contratos, no implementaciones concretas.
 
-> 📸 Ver capturas en la carpeta `capturas/`
+### Regla 4 — procesadoresImplementanPuerto
+Todas las clases en `..adaptadores.procesadores..` deben implementar
+`ProcesadorPedido`. Evita adaptadores que no cumplan el contrato del puerto.
 
----
+### Regla 5 — infraNoAccedeRest
+La infraestructura (`..infraestructura..`) no debe acceder a los adaptadores REST.
+Evita dependencias inversas entre capas.
 
-## Quality Gate: Passed
-
-📸 `capturas/quality-gate-passed.png`
-
----
-
-## Pruebas
-
-| Clase de prueba | Tipo | Patron verificado |
-|---|---|---|
-| `ProcesadorPedidoFactoryTest` | Unitaria | Factory + Strategy |
-| `IntegracionPedidosTest` | @SpringBootTest | Facade + Observer + flujo completo |
-| `ArquitecturaTest` | ArchUnit | Desacoplamiento entre capas |
-
----
-
-## Ejecución
+### Ejecucion local
 
 ```bash
-# Compilar y probar
-mvn clean test
+# Solo reglas de arquitectura
+mvn test -Dtest=ReglasArquitectura
 
-# Análisis SonarQube
-mvn clean verify sonar:sonar -Dsonar.token=TU_TOKEN -Dsonar.scm.disabled=true
-
-# Ejecutar la aplicación
-mvn spring-boot:run
-
-# Probar el endpoint REST
-curl -X POST http://localhost:8080/api/pedidos \
-  -H "Content-Type: application/json" \
-  -d '{"descripcion":"Pedido test","subtotal":100.0,"tipo":"EXPRESS"}'
+# Suite completa
+mvn verify
 ```
 
 ---
 
-## Commits del repositorio
+## Decisiones de Diseno (ADR)
 
-| # | Mensaje |
-|---|---|
-| 1 | `feat: Strategy + Factory para procesamiento de pedidos por tipo` |
-| 2 | `feat: Observer con Spring Events para notificaciones desacopladas` |
-| 3 | `feat: Facade REST y pruebas de integracion + ArchUnit` |
+| ADR | Decision | Estado |
+|---|---|---|
+| [ADR-001](docs/adr/ADR-001.md) | Arquitectura Hexagonal para aislar el dominio | Aceptado |
+| [ADR-002](docs/adr/ADR-002.md) | Factory + Strategy para seleccion de procesador | Aceptado |
+| [ADR-003](docs/adr/ADR-003.md) | Spring Events (Observer) para notificaciones | Aceptado |
+
+---
+
+## Pipeline GitHub Actions
+
+El workflow `.github/workflows/arquitectura.yml` se ejecuta en cada push a `main`
+y `develop`. Primero ejecuta las 5 reglas ArchUnit y luego la suite completa.
+
+- **Pipeline verde:** todas las reglas pasan → `capturas/pipeline-verde.png`
+- **Pipeline rojo:** violacion intencional detectada → `capturas/pipeline-rojo.png`
+
+---
+
+## Metricas SonarQube
+
+| Metrica | Antes (Legacy) | Despues |
+|---|---|---|
+| CC servicio principal | 4 | 1 |
+| Cognitive Complexity | 6 | 0 |
+| Cobertura | — | ≥ 80% |
+
+---
+
+## Ejecucion
+
+```bash
+mvn clean test
+mvn verify
+```
 
 ---
 

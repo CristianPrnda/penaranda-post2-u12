@@ -54,8 +54,4 @@ public class Pedido {
 
     public EstadoPedido getEstado() { return estado; }
     public void setEstado(EstadoPedido estado) { this.estado = estado; }
-
-    public void metodoViolacion() {
-    com.empresa.pedidos.infraestructura.persistencia.RepositorioPedidosJpa repo = null;
-}
 }
